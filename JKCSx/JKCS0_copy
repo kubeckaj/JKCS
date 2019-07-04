@@ -126,57 +126,57 @@ Composition     1_1 1_2 1_3
 function add {
   what=`echo $1 | awk '{print tolower($0)}'`
   case ${what} in
-  "a"|"am") echo   "  A      0   $path1/nh3.xyz"         >> $userinputfile
-       echo   "  A      1   $path1/nh4.xyz"         >> $userinputfile
+  "a"|"am") echo   "  A      0   1   $path1/nh3.xyz"         >> $userinputfile
+       echo   "  A      1   1   $path1/nh4.xyz"         >> $userinputfile
        ;;
-  "hno3") echo   "  HNO3      0   $path1/hno3.xyz"         >> $userinputfile
-       echo   "  HNO3     -1   $path1/no3.xyz"         >> $userinputfile
+  "hno3") echo   "  HNO3      0   1   $path1/hno3.xyz"         >> $userinputfile
+       echo   "  HNO3     -1   1   $path1/no3.xyz"         >> $userinputfile
        ;;
-  "sa") echo  "  SA     0   $path1/h2so4.xyz"       >> $userinputfile
-        echo  "  SA     0   $path2/h2so4_cis.xyz"   >> $userinputfile
-        echo  "  SA    -1   $path1/hso4.xyz"        >> $userinputfile
-        echo  "  SA    -2   $path1/so4.xyz"         >> $userinputfile
+  "sa") echo  "  SA     0   1   $path1/h2so4.xyz"       >> $userinputfile
+        echo  "  SA     0   2   $path2/h2so4_cis.xyz"   >> $userinputfile
+        echo  "  SA    -1   1   $path1/hso4.xyz"        >> $userinputfile
+        echo  "  SA    -2   1   $path1/so4.xyz"         >> $userinputfile
         ;;
-  "gd") echo  "  GD     0   $path2/g.xyz"           >> $userinputfile
-        echo  "  GD     1   $path1/guanidinium.xyz" >> $userinputfile
+  "gd") echo  "  GD     0   1   $path2/g.xyz"           >> $userinputfile
+        echo  "  GD     1   1   $path1/guanidinium.xyz" >> $userinputfile
         ;;
-  "w") echo   "  W     -1   $path1/oh.xyz"          >> $userinputfile
-       echo   "  W      0   $path2/aq.xyz"          >> $userinputfile
-       echo   "  W      1   $path2/aqp.xyz"         >> $userinputfile
+  "w") echo   "  W     -1   1   $path1/oh.xyz"          >> $userinputfile
+       echo   "  W      0   1   $path2/aq.xyz"          >> $userinputfile
+       echo   "  W      1   1   $path2/aqp.xyz"         >> $userinputfile
        ;;
-  "msa") echo "  MSA    0   $path2/msa.xyz"         >> $userinputfile
-         echo "  MSA   -1   $path2/msam.xyz"        >> $userinputfile
+  "msa") echo "  MSA    0   1   $path2/msa.xyz"         >> $userinputfile
+         echo "  MSA   -1   1   $path2/msam.xyz"        >> $userinputfile
          ;;
-  "dma") echo "  DMA    0   $path1/c2h6nh.xyz"      >> $userinputfile
-         echo "  DMA    1   $path2/dmap.xyz"        >> $userinputfile
+  "dma") echo "  DMA    0   1   $path1/c2h6nh.xyz"      >> $userinputfile
+         echo "  DMA    1   1   $path2/dmap.xyz"        >> $userinputfile
          ;;
-  "co2") echo "  CO2    0   $path1/co2.xyz"         >> $userinputfile
+  "co2") echo "  CO2    0   1   $path1/co2.xyz"         >> $userinputfile
          ;;
-  "ch4") echo "  CH4    0   $path1/ch4.xyz"         >> $userinputfile
+  "ch4") echo "  CH4    0   1   $path1/ch4.xyz"         >> $userinputfile
          ;;
-  "ar") echo  "  Ar     0   $path1/ar.xyz"          >> $userinputfile
+  "ar") echo  "  Ar     0   1   $path1/ar.xyz"          >> $userinputfile
         ;;
-  "he") echo  "  He     0   $path1/he.xyz"          >> $userinputfile
+  "he") echo  "  He     0   1   $path1/he.xyz"          >> $userinputfile
         ;;
-  "cl") echo  "  Cl    -1   $path1/cl.xyz"          >> $userinputfile
+  "cl") echo  "  Cl    -1   1   $path1/cl.xyz"          >> $userinputfile
         ;;
-  "na") echo  "  Na     1   $path1/na.xyz"          >> $userinputfile
+  "na") echo  "  Na     1   1   $path1/na.xyz"          >> $userinputfile
         ;;
-  "ne") echo  "  Ne     0   $path1/ne.xyz"          >> $userinputfile
+  "ne") echo  "  Ne     0   1   $path1/ne.xyz"          >> $userinputfile
         ;;
-  "urea") echo   "  urea   0   $path1/urea.xyz"     >> $userinputfile
+  "urea") echo   "  urea   0   1   $path1/urea.xyz"     >> $userinputfile
        ;;
-  "h") echo   "  H      1   $path1/h.xyz"           >> $userinputfile
+  "h") echo   "  H      1   1   $path1/h.xyz"           >> $userinputfile
        ;;
-  "tma") echo "  TMA    0   $path2/tma.xyz"         >> $userinputfile
-         echo "  TMA    1   $path2/tmap.xyz"        >> $userinputfile
+  "tma") echo "  TMA    0   1   $path2/tma.xyz"         >> $userinputfile
+         echo "  TMA    1   1   $path2/tmap.xyz"        >> $userinputfile
          ;;
-  "hio3") echo "  HIO3   0   $path2/hio3.xyz"         >> $userinputfile
-         echo "  HIO3  -1   $path2/io3.xyz"        >> $userinputfile
+  "hio3") echo "  HIO3   0   1   $path2/hio3.xyz"         >> $userinputfile
+         echo "  HIO3  -1   1   $path2/io3.xyz"        >> $userinputfile
          ;;
-  "hio2") echo "  HIO2   0   $path2/hio2.xyz"         >> $userinputfile
+  "hio2") echo "  HIO2   0   1   $path2/hio2.xyz"         >> $userinputfile
          ;;
-  "i2o5") echo "  I2O5   0   $path2/i2o5.xyz"         >> $userinputfile
+  "i2o5") echo "  I2O5   0   1   $path2/i2o5.xyz"         >> $userinputfile
          ;;
   *) echo "$scriptfile: error input: argument does not exist [EXITING]"
      exit

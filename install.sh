@@ -1,6 +1,8 @@
 #!/bin/bash
 # This is just some simple "installation" script which: 1) setup your .basrc. 2) create programs.txt
 
+chmod -R +x JKCSx
+chmod -R +x TOOLS
 # START
 echo "-----------------------"
 echo 'Hi, I will just test what is written in your ~/.bashrc file'

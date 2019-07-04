@@ -81,6 +81,10 @@
 # "sbatch" "" "JKsend" "echo Hi" 
 # !!! empty means no queueing
 
+  #programSendToQueue1part="sbatch"
+  #parameters=""
+  #programSendToQueue2part="JKsend"
+  
   programSendToQueue1part="sbatch"
   parameters=""
   programSendToQueue2part="JKsend"

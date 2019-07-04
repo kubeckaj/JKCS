@@ -85,9 +85,9 @@
   #parameters=""
   #programSendToQueue2part="JKsend"
   
-  programSendToQueue1part="sbatch"
+  programSendToQueue1part=""
   parameters=""
-  programSendToQueue2part="JKsend"
+  programSendToQueue2part=""
 
 
 

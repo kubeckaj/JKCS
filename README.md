@@ -44,7 +44,7 @@ Jammy Key for Configurational Sampling
     # adjust the rest of programs.txt:
     # QUEING, QUANTUM CHEMISTRY PROGRAMS etc.
     
-    and the rest you have to consult with manual (! JKCS1.0 does not have so advanced manual, in  case ask Jacob for help !)
+  and the rest you have to consult with manual (! JKCS1.0 does not have so advanced manual, in  case ask Jacob for help !)
     
     
    

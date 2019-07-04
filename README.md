@@ -1,4 +1,4 @@
-# JKCS (=JKCS1.06)
+# JKCS (=JKCS1.09)
 Jammy Key for Configurational Sampling
 
   We strongly recommend people from outside of our research group to wait when JKCS2.0 will be released (end of summer 2019).

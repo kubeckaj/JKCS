@@ -3,9 +3,9 @@ Jammy Key for Configurational Sampling
 
   We strongly recommend people from outside of our research group to wait when JKCS2.0 will be released (end of summer 2019).
   
-HOW TO SETUP:
+  HOW TO SETUP:
 
-   cd {YOUR_APPS_DIR}                               #enter to the directory with your scripts
+   cd ${YOUR_APPS_DIR}                              #enter to the directory with your scripts
    git clone https://github.com/kubeckaj/JKCS.git   #copy JKCS (JKCS folder is created)
    cd JKCS
    ls

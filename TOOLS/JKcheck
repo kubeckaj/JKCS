@@ -1,0 +1,73 @@
+#/bin/bash
+Qprint=0
+if [ "$*" == "-p" ]
+then
+  Qprint=1
+fi
+
+queuefile=queue.dat
+queuefile2=queue2.dat
+
+if [ $Qprint -eq 1 ];then echo "Start";fi 
+###
+function checkfinished {
+  jobs=`cat $queuefile | xargs`
+  for i in $jobs
+  do
+    state=`sacct -j $i  --format=State | tail -n 1`
+    if [ $Qprint -eq 1 ];then echo "$i $state";fi 
+    if [[ "$state" = *"COMPLETED"* ]]
+    then
+      continue
+    else
+      if [[ "$state" = *"FAILED"* ]] || [[ "$state" = *"CANCELLED"* ]] 
+      then
+        echo "ERROR"
+        exit
+      fi
+      if [ $Qprint -eq 1 ];then echo "Job $i is not finnished yet: .$state.";fi
+      echo "NOT YET"
+      exit
+    fi
+  done
+}
+### 
+function checkfinished2 {
+  jobs=`cat $queuefile2 | xargs`
+  for i in $jobs
+  do
+    state=`sacct -j $i  --format=State | tail -n 1`
+    if [[ $state = *"COMPLETED"* ]] || [[ $state = *"FAILED"* ]] || [[ "$state" = *"CANCELLED"* ]]
+    then
+      continue
+    else
+      if [ $Qprint -eq 1 ];then echo "Job $i is not finnished yet: .$state.";fi
+      echo "NOT YET"
+      exit
+    fi
+  done
+}
+###
+
+###
+if [ $Qprint -eq 1 ];then echo "removing 1.file";fi 
+if [ -e $queuefile ]
+then
+  if [ $Qprint -eq 1 ];then echo "Checking queuefile";fi 
+  checkfinished
+  if [ $Qprint -eq 1 ];then echo "Done queuefile";fi
+  rm $queuefile
+fi
+###
+if [ $Qprint -eq 1 ];then echo "removing 2.file";fi 
+if [ -e $queuefile2 ]
+then
+  if [ $Qprint -eq 1 ];then echo "Checking queuefile2";fi 
+  checkfinished2
+  if [ $Qprint -eq 1 ];then echo "Done queuefile2";fi 
+  rm $queuefile2
+fi
+###
+if [ $Qprint -eq 1 ];then echo "FINISHED";fi 
+echo "Done"
+

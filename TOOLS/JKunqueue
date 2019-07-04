@@ -1,0 +1,9 @@
+for i in queue.dat queue2.dat
+do
+  if [ -e $i ]
+  then
+    cat $i | awk '{print "qdel ",$1}' | sh
+    rm $i
+  fi
+done
+JKcheck

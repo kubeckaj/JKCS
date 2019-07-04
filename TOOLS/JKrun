@@ -1,0 +1,562 @@
+#!/bin/bash -l
+#SBATCH -p longrun
+#SBATCH -N 1
+#SBATCH -n 1
+#SBATCH -t 240:00:00
+#SBATCH --mem=1000mb
+#SBATCH -e ERRORJKrun.err
+#SBATCH -o JKrun.out
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program for sending jobs to queue                      ##
+## To understand program run help:                        ##
+##        JKrun -help                                     ##
+############################################################
+## "Imagine, how you would be rich if you were paid for   ##
+## each job running on cluster."         Jakub Kubecka    ##
+############################################################
+
+###############################################################################
+################################     HELP     #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+echo JKrun: JKrun " $*" >> output
+
+### THIS IS HELP
+function help {
+  echo "THIS IS HELP:"
+  echo "Program for sending jobs to queue"
+  echo """
+  JKrun [OPTIONS] [FILES]
+  ----------------------------------------------------------------
+  ALL OPTIONS:
+   -help ............ print this help and exit
+   -p,-program \"XX\" . program [default=G16,XTB]
+   -o,-opt \"XXX\"..... now useful just for XTB, see examples
+   -r,-repeat \"X\" ... max calc. repeats [default=0], just for G16
+   -m,-max \"X\" ...... max running jobs in once [default=100]
+   -f,-feed \"X\" ..... feed one queue by X jobs
+   -i,-inp \"X\" ...... inputs are saved in file X
+   -ow,-overwrite ... if output file exists, it is overwritten
+   -ow2,-overwrite2 . if output file exists, but did not finished, it is overwritten
+   -q,-queue \"X\" .... where to write sent jobs
+   -programs \"X\" .... name of file with names of programs
+   -t,-time 10:00:00  example of changing walltime
+   -partition(-par)
+
+  FILES:
+   gaussian (G16), XTB, DLPNO or (ORCA/not yet) expected
+
+  ADVANCED EXAMPLES:
+      JKrun -m 200 -inp allfiles.dat
+      JKrun
+   
+  ----------------------------------------------------------------
+ 
+  BASIC EXAMPLES:
+  --------------
+ 
+  G16:
+    calculate all .com files (not for those with existing output file ... check -ow)
+      JKrun 
+    calculate file.com
+      JKrun file.com
+    if calculation does not work, the output probably already exist. Then
+      JKrun -ow file.com
+
+  GNF-xTB:
+   optimize myfile.xyz (charge +1) 
+      JKrun -p \"XTB\" -opt \"-opt -chrg +1\" myfile.xyz 
+
+  DLPNO:
+      JKrun -p DLPNO myfile.xyz
+  """
+  exit
+}
+
+###############################################################################
+################################  USER INPUT  #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# max procesors
+Qmax=100
+# [G16],[XTB],[ORCA],[DLPNO]
+program="G16" 
+# max repetition
+Qmaxrepeating=0
+Qfeed=1
+Qexist=1            # no calculation if file output (.log) exist
+Qexistfinished=1    # no calculation if file output (.log) is finished
+Qtime="72:00:00"
+Qqueue=0
+queuefilesave=""
+Qprograms=programs.txt # where to read programs
+parameters=""
+
+next=0
+last=""
+what=""
+### SOLVING INPUT
+for i in "$@"
+do
+  if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi
+  firstletter=`echo $i | cut -c 1`
+  if [ "$firstletter" == "-" ] || [ $next -eq 1 ]
+  then
+    ### -program "X"
+    if [ "$last" == "-program" ]
+    then
+      program=$i
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-program" ] || [ "$i" == "-p" ]
+    then
+      next=1
+      last="-program"
+    fi
+    ### -repeat "X"
+    if [ "$last" == "-repeat" ]
+    then
+      Qmaxrepeating=$i
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-repeat" ] || [ "$i" == "-r" ]
+    then
+      next=1
+      last="-repeat"
+    fi
+    ### -maxcpu X
+    if [ "$last" == "-max" ]
+    then
+      Qmax=$i
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-max" ] || [ "$i" == "-m" ]
+    then
+      next=1
+      last="-max"
+    fi
+    ### -feee X
+    if [ "$last" == "-feed" ]
+    then
+      Qfeed=$i
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-feed" ] || [ "$i" == "-f" ]
+    then
+      next=1
+      last="-feed"
+    fi
+    ### -opt "X"
+    if [ "$last" == "-opt" ]
+    then
+      Qopt="\"$i\""
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-opt" ] || [ "$i" == "-o" ]
+    then
+      next=1
+      last="-opt"
+    fi
+    # partition 
+    if [ "$last" == "-par" ]
+    then
+      last=''
+      parameters+=" -p $i"
+      next=0
+      continue
+    fi
+    if [ "$i" == "-par" ] || [ "$i" == "-partition" ]
+    then
+      last="-par"
+      next=1
+      continue
+    fi
+    ### -time "X"
+    if [ "$last" == "-time" ]
+    then
+      Qtime="$i"
+      parameters+=" --time $i"
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-time" ] || [ "$i" == "-t" ]
+    then
+      next=1
+      last="-time"
+    fi
+    ### -inp "X"
+    if [ "$last" == "-inp" ]
+    then
+      Qinp=$i
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-inp" ] || [ "$i" == "-i" ]
+    then
+      next=1
+      last="-inp"
+    fi
+    ### -queue "X"
+    if [ "$last" == "-queue" ]
+    then
+      queuefilesave=$i
+      Qqueue=1
+      last=""
+      next=0
+    fi
+    if [ "$i" == "-queue" ] || [ "$i" == "-q" ]
+    then
+      next=1
+      last="-queue"
+    fi
+    ### -overwrite
+    if [ "$i" == "-overwrite" ] || [ "$i" == "-ow" ]
+    then
+      Qexist=0
+      Qexistfinished=0
+    fi
+    ### -overwrite2
+    if [ "$i" == "-overwrite2" ] || [ "$i" == "-ow2" ]
+    then
+      Qexist=0
+      Qexistfinished=1
+    fi
+    # programs
+    if [ "$last" == '-programs' ]
+    then
+      if [ "$i" == 2 ]
+      then
+        Qprograms="programs2.txt"
+      else
+        Qprograms="$i"
+      fi
+      next=0
+      continue
+    fi
+    if [ "$i" == "-programs" ]
+    then
+      next=1
+      last='-programs'
+      continue
+    fi
+    ###
+  else
+    ### UPDATE LOG FILES
+    what+="$i "
+  fi
+done
+
+#TODO  This is absolutely stupid but works now
+# I have to change in future
+Qmax=`echo $Qmax*$Qfeed|bc`
+
+#CHECK WHAT
+if [ -z "$what" ]; 
+then 
+  if [ ! -z "$Qinp" ]
+  then
+    what=`cat $Qinp`
+    if [ -z "$what" ]
+    then
+      echo "JKrun: Input file is empty or does not exist [EXITING]"
+      exit
+    fi
+  else
+    echo "JKrun: Files to be submitted are filled automatically"
+    if [ $program == "G16" ]
+    then 
+      what=`ls *.com`;
+    elif [ $program == "ORCA" ]
+    then
+      what=`ls *.job`;
+    else
+      what=`ls *.xyz`;
+    fi
+  fi
+fi
+#echo "THIS OS USER INPUT: $what"
+
+# frequency calculation ?
+if [ "$program" == "G16" ]
+then
+  firstfile=`echo $what | awk '{print $1}'`
+  freqcount=`grep -i -c "freq" $firstfile`
+  if [ $freqcount -eq 1 ]
+  then
+   QNT=2
+  else
+   QNT=1
+  fi
+fi
+
+parameters2=$parameters
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+# load functions
+source $toolspath/TOOLSextra/functions.sh
+
+# programs
+source $scriptpath/../$Qprograms
+
+# module loading
+if [ $program == "G16" ] && hash Mgaussian 2>/dev/null #&& [ $Qfeed -eq 0 ]
+then
+  Mgaussian 2>/dev/null
+fi
+
+parameters="$parameters $parameters2"
+# functions
+### check if job is finished
+# [0=no or 1=yes or -1=error] = `finished [file.log]`
+function finished {
+ case "$program" in
+   "G16") if [ -e $1 ]
+          then 
+            NTcount=`grep -c "Normal termination" $1`
+            ERRcount=`grep -i -c "error" $1` ## THIS MIGHT BE TRICKY
+            if [ $NTcount -eq $QNT ] || [ ! $ERRcount -eq 0 ]
+            then
+              if [ $NTcount -eq $QNT ] #|| [ $howmuch -eq $Qmaxrepeating ]
+              then 
+                echo 1
+              else
+                echo -1
+              fi
+            else
+              echo 0
+            fi
+          else
+            echo 0
+          fi
+          ;;
+   "XTB") if [ -e $1 ]
+          then
+            echo 1 
+          else
+            echo 0
+          fi
+          ;;
+ esac
+}
+
+### send job 
+function sendjob {
+  case "$program" in 
+    "G16")   if [ $Qfeed -eq 1 ] || [ "$1" != "-inp" ]
+             then
+               jobinput=$1
+             else
+               jobinput=`cat $2`
+             fi
+             jobname=''
+             if [ $gaussianCUTEXT -eq 1 ]
+             then
+               for i in $jobinput
+               do
+                 jobname+=" `basename $i .com`"
+               done 
+             else
+               jobname="$jobinput"
+             fi
+             if [ ! $gaussianTIME -eq 1 ]
+             then
+               Qtime=''
+             fi
+             command="$gaussian $Qtime $jobname"
+             echo $command
+             sh -c "$command" > G16output 2>&1
+             queue=`cat G16output`
+             rm G16output
+             ;;
+    "XTB")   command="$toolspath/TOOLSextra/JKxtb.sh -programs $Qprograms $*"
+             echo "$command" > run${scriptfile}${random}.sh
+             # checking queue program
+             if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+             then
+               # calculate
+               sh run${scriptfile}${random}.sh
+             else
+               # calculate ... send to queue
+               queue=`eval $programSendToQueue1part $parameters $programSendToQueue2part sh run${scriptfile}${random}.sh`
+             fi
+             ##################### 
+             ;;
+    "DLPNO") jobname=`basename $1 .xyz`
+             $dlpno $*
+             if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+             then 
+               #calculate
+               sh -c "sh $jobname.job"
+             else
+               queue=`sbatch $jobname.job`
+             fi
+             ;;
+    "ORCA")  jobname=`basename $1 .job`
+             if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+             then
+               #calculate
+               sh -c "sh $jobname.job"
+             else
+               queue=`sbatch $jobname.job`
+             fi
+             ;;
+  esac
+  echo "$scriptfile: $queue"
+  if [ $Qqueue -eq 1 ]
+  then
+    echo $queue | awk '{print $4}' >> $queuefilesave 
+  fi
+}
+
+### check Qexist and Qexistfinished
+### prepare howmuch
+for i in $what
+do
+  filein=$i
+  pi=`basename $i .xyz`
+  fileout=`basename $pi .com`.log
+  ### TEST IF OUTPUT EXIST
+  if [ $Qexist -eq 1 ]
+  then
+    if [ -e $fileout ]
+    then
+      continue
+    fi
+  fi
+  ### TEST IF FINISHED OUTPUT EXIST
+  if [ $Qexistfinished -eq 1 ]
+  then
+    T1=`finished $fileout`
+    if [ -e $fileout ]
+    then
+      continue
+    fi
+  fi
+  whatNEXT+=" $i "
+  whathowmuch+="0 "
+done
+what=$whatNEXT
+
+echo "JKrun: what = $what"
+# LOOP OVER WHAT
+runningcount=0
+while [ ! -z "$what" ] || [ ! -z "$running" ]
+do
+  if [ $runningcount -ge $Qmax ] || [ -z "$what" ];then sleep 10;echo "waiting 10 sec";fi
+  ### SEND NEW JOBS UNTIL YOU HAVE SPACE TO SEND THEM
+  while [ $runningcount -lt $Qmax ] && [ ! -z "$what" ]
+  do
+    sendnowALL=""
+    for ii in `seq 1 $Qfeed`
+    do
+      if [ -z "$what" ]; then continue; fi
+      ### NEXT WHAT
+      sendnow=`echo $what | awk '{print $1}'`
+      howmuchnow=`echo $whathowmuch | awk '{print $1}'`
+      howmuchnow=`echo $howmuchnow+1|bc`
+
+      running+=" $sendnow "
+      runningcount=`echo $runningcount+1 |bc`
+      runninghowmuch+=" $howmuchnow "
+      
+      if [ `echo $what |  sed 's/ //g'` == "$sendnow" ] 
+      then 
+        what=""
+        whathowmuch=""
+      else
+        what=`echo $what | awk '{for(i=2;i<NF;i++)printf"%s",$i OFS;if(NF)printf"%s",$NF;printf ORS}'`
+        whathowmuch=`echo $whathowmuch | awk '{for(i=2;i<NF;i++)printf"%s",$i OFS;if(NF)printf"%s",$NF;printf ORS}'`
+      fi
+      sendnowALL+=" $sendnow"
+    done
+    #echo "what = $what"  
+    #echo "RHM=$runninghowmuch and WHM=$whathowmuch"
+    #echo "Qfeed = $Qfeed"
+    #echo "sendnowALL = $sendnowALL"
+    #echo "Qopt = $Qopt"
+    jobsN=`Felements $sendnowALL`
+    if [ $jobsN -lt 2 ]
+    then 
+      sendjob $sendnowALL $Qopt
+    else
+      #queue file name
+      random=$RANDOM
+      test=0
+      while [ $test -eq 0 ]
+      do
+        queueJKrun=queueJKrun${random}.dat
+        if [ -e "$queueJKrun" ]
+        then
+          random=$RANDOM
+        else
+          test=1
+        fi
+      done
+      ######################
+      echo $sendnowALL > queueJKrun${random}.dat 
+      sendjob "-inp" queueJKrun${random}.dat "$Qopt"   
+    fi
+  done
+  ### DOES IT MAKE SENSE TO WAIT ???
+  if [ -z "$what" ]
+  then
+    if [ $Qmaxrepeating -eq 0 ] || [ $Qfeed -gt 1 ]
+    then 
+      echo 'JKrun: succesfully exiting'
+      exit
+    fi
+  fi
+  ### CHECK FINISHED JOBS
+  runningcount=0
+  runningNEXT=""
+  runninghowmuchNEXT=""
+  N=0
+  for i in $running
+  do
+    N=`echo $N+1|bc`
+    pi=`basename $i .xyz`
+    fileout=`basename $pi .com`.log
+    ### WHAT TO DO AFTER CHECKING FILE
+    case `finished $fileout` in
+      "1")  echo "$i has been finished"
+            ;;
+      "-1") howmuchnow=`echo $runninghowmuch | awk -v var=$N '{print $var}'`
+            #echo $whathowmuch
+            #echo "HM=$howmuchnow   and  QMR=$Qmaxrepeating"
+            if [ $howmuchnow -ge $Qmaxrepeating ]
+            then
+              echo "$i has not been finished yet"
+            else
+              $toolspath/JKlog2com -same $fileout
+              what+=" $i "
+              #howmuchnow=`echo $howmuchnow+1 |bc`
+              whathowmuch+=" $howmuchnow "
+            fi
+            ;;
+      "0")  runningcount=`echo $runningcount+1 |bc`
+            runningNEXT+=" $i "
+            runninghowmuchNEXT+=" `echo $runninghowmuch | awk -v var=$N '{print $var}'` "
+            ;;
+    esac
+  done
+  running=$runningNEXT
+  runninghowmuch=$runninghowmuchNEXT
+done
+

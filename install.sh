@@ -1,3 +1,5 @@
+#!/bin/bash
+# This is just some simple "installation" script which: 1) setup your .basrc. 2) create programs.txt
 
 # START
 echo "-----------------------"

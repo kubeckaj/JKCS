@@ -5,20 +5,20 @@ Jammy Key for Configurational Sampling
   
   HOW TO SETUP:
 
-   cd ${YOUR_APPS_DIR}                              #enter to the directory with your scripts
-   git clone https://github.com/kubeckaj/JKCS.git   #copy JKCS (JKCS folder is created)
-   cd JKCS
-   ls
-   sh install.sh                                    #run basic "setup"
-   source ~/.bashrc                                 #required after first "installation"
+    cd ${YOUR_APPS_DIR}                              #enter to the directory with your scripts
+    git clone https://github.com/kubeckaj/JKCS.git   #copy JKCS (JKCS folder is created)
+    cd JKCS
+    ls
+    sh install.sh                                    #run basic "setup"
+    source ~/.bashrc                                 #required after first "installation"
    
-   # adjust programs.txt:
-   # ABCluster: rigidmoloptimizer path
-   # XTB: xtb path, XTBHOME path
-   # PYTHON: please setup how to use python2.x (python3 works in JKCS2.0, but not in JKCS1.0)
-   # If neaded load modules: Mpython ...
+    # adjust programs.txt:
+    # ABCluster: rigidmoloptimizer path
+    # XTB: xtb path, XTBHOME path
+    # PYTHON: please setup how to use python2.x (python3 works in JKCS2.0, but not in JKCS1.0)
+    # If neaded load modules: Mpython ...
    
-   Simple TEST (on local computer):
+  Simple TEST (on local computer):
    
     cd $WRKDIR                 #go to your working directory
     mkdir TESTING_JKCS         #create a new forder 

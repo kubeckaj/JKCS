@@ -1,0 +1,90 @@
+################
+### GAUSSIAN ###
+################
+#-not connected with queuing (see bellow)
+
+#gaussian 16 has been tested sucesfully
+#format: gaussian TIME file(ext?)
+
+#remove extension of file? remove .com?
+  gaussianCUTEXT=1   # 1=YES / 2=NO
+#add time? (TIME is added automatically)
+  gaussianTIME=1  # 1=YES / 2=NO
+#program
+  gaussian="JKsubg16"
+
+#modules
+  function Mgaussian {
+    module add gaussian/G16RevA.03 
+  }
+
+############
+### ORCA ###
+############
+
+#how to call Orca program
+  orca=/wrk/kubeckaj/DONOTREMOVE/Apps/ORCA/orca_4_0_1_2_linux_x86-64_openmpi202/orca
+
+#modules
+  Morca="module add orca-env/4.0.1.2"
+
+#############
+### DLPNO ###
+#############
+
+#how to call DLPNO script (please write your own which works on your system)
+  dlpno="JKorcaDLPNO"
+ 
+###########
+### XTB ###
+###########
+
+#how to call xtb
+  xtb="/wrk/kubeckaj/DONOTREMOVE/Apps/XTB6.0/bin/xtb"
+  XTBHOME=/wrk/kubeckaj/DONOTREMOVE/Apps/XTB6.0/
+  export XTBHOME
+
+#################
+### ABCluster ###
+#################
+
+#rigidmol-optimizer script
+  rigidmoloptimizer="/wrk/kubeckaj/DONOTREMOVE/Apps/ABCluster-Linux/rigidmol-optimizer"
+
+#################
+### GoodVibes ###
+#################
+  
+#GoodVibes script
+# this script should load neccesarry libraries and then call python GoodVibes.py inputLOG
+  goodvibes=/wrk/kubeckaj/DONOTREMOVE/Apps/goodvibes/JKgoodvibes.sh
+
+##############
+### Python ###
+##############
+
+#python 2.7.1 has been tested sucesfully
+  python="python2.7"
+
+#modules
+  function Mpython {
+    module load python-env/2.7.13 
+  }
+
+################
+### Queueing ###
+################
+
+# format:
+# $programSendToQueue1part $parameters $programSendToQueue2part PROCESS
+# example:
+# "sbatch" "" "JKsend" "echo Hi" 
+# !!! empty means no queueing
+
+  programSendToQueue1part="sbatch"
+  parameters=""
+  programSendToQueue2part="JKsend"
+
+
+
+

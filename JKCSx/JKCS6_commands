@@ -1,0 +1,177 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program that runs sequantually commands for JKCS       ##
+## To understand program run help:                        ##
+##       for help use arguement -help                     ##
+############################################################
+## "OMG, I would like to be slim that nobody would be     ##
+## able to see me."                         Jakub Kubecka ##
+############################################################
+
+### THIS IS HELP
+function help {
+  echo "THIS IS HELP:"
+  echo "Program that runs sequantually commands for JKCS"
+  echo """
+           DO NOT RUN THIS SCRIPT WITHOUT DISCUSSION WITH JACOB
+           
+           example:
+                sbatch -p longrun --time 240:00:00 JKsend JKCS6_commands
+                sbatch -p series  --time  24:00:00 JKsend JKCS6_commands
+
+  """
+  exit
+}
+  
+###############################################################################
+################################  USER INPUT  #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+Qprograms=programs.txt
+Qmail=0
+for i in $*
+do
+  if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi
+  if [ "$i" == '-mtJK' ]
+  then
+    recipients+=" jakub.kubecka@helsinki.fi"
+    Qmail=1
+    continue
+  fi
+  if [ "$last" == "-m" ]
+  then
+    last=''
+    Qmail=1
+    recipients+=" $i"
+    continue
+  fi
+  if [ "$i" == '-m' ] || [ "$i" == "-mail" ]
+  then 
+    last='-m'
+    continue
+  fi 
+  # folder
+  L4=`echo $i | cut -c1-4`
+  if [ -d "$i" ] && [ "$L4" == "SYS_" ]
+  then
+    folders+=" $i"
+    continue
+  fi
+done
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+# load functions
+source $toolspath/TOOLSextra/functions.sh
+
+# load parameters
+source $toolspath/TOOLSextra/loadparameters.sh
+
+# programs
+source $toolspath/../$Qprograms
+
+###############################################################################
+
+##################################################
+## LOOP OVER ALL FOLDERS UNTIL NOT FINISHED ALL ##
+##################################################
+foldernow=`pwd`
+finished=0
+ERROR=0
+while [ $finished -eq 0 ]
+do
+  finished=1
+  for folder in $folders
+  do
+    cd $foldernow
+    if [ -e "ERROR" ] || [ -e "FINISHED" ]
+    then
+      finished=1
+      break
+    fi
+    #echo "Entering folder $folder."
+    if [ ! -d $folder ]; then echo "$scriptfile: Some problem in reading directory $folder"; exit ; fi
+    cd $folder
+    # checking ERROR and FINISHED file existence
+    if [ -e "ERROR" ] || [ -e "FINISHED" ]
+    then
+      continue
+    fi
+    movenext=0
+    while [ $movenext -eq 0 ]
+    do
+      if [ -e "ERROR" ] || [ -e "FINISHED" ]
+      then
+        break
+      fi
+      test=`JKcheck`
+      # is queue saying FAILED?
+      if [ "$test" == "ERROR" ]
+      then
+        echo "$scriptfile: In folder ${folder} has failed some of the queued jobs."
+        touch ERROR
+        ERROR=1
+        movetonext=1
+        continue
+      fi
+      ## new job
+      if [ "$test" == "Done" ]
+      then
+        if [ ! -e $commandssendfile ]
+        then
+          touch $commandssendfile
+        fi
+        rows=`cat $commandssendfile | wc -l`
+        rowsC=`cat $foldernow/$commandsfile | wc -l`
+        #echo $rows $rowsC
+        if [ $rowsC -gt $rows ]
+        then
+          rows1=`echo $rows+1 | bc`
+          command=`head -n $rows1 $foldernow/$commandsfile | tail -n 1`
+          firstletter=`echo "$command" | cut -c-1`
+          if [ ! "$firstletter" == "#" ] && [[ "$command" != *"JKCS1"* ]]
+          then
+            eval ${command}
+          fi
+          echo "$command" >> $commandssendfile
+          finished=0
+        else
+          touch "FINISHED"
+          movenext=1
+        fi
+      else 
+        finished=0
+        movenext=1
+      fi
+    done
+    ##
+  done  
+  #wait 30 sec
+  sleep 30
+done
+
+if [ $Qmail -eq 1 ]
+then
+  dir=`pwd`
+  for mailaddress in $recipients
+  do 
+    if [ $ERROR -eq 1 ] 
+    then
+      sbatch --job-name="ERROR:$dir" --mail-type=END --mail-user=$mailaddress JKsend echo sending mail 
+    else
+      sbatch --job-name="SUCCES:$dir" --mail-type=END --mail-user=$mailaddress JKsend echo sending mail 
+    fi
+  done
+fi
+

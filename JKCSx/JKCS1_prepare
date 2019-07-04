@@ -1,0 +1,329 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program for preparing different cluster compositions   ##
+## To adjust program just change setup                    ##
+##       for help use arguement -help                     ##
+############################################################
+## "Я весёлый поросенок, Я играю и пою, Солнце всходит,   ##
+## И заходит, И в душе, Моей светло."  JK:"I LOVE IT!"    ##
+############################################################
+
+### THIS IS HELP
+function help {
+  echo "THIS IS HELP:"
+  echo "Program for preparing different cluster compositions"
+  echo """
+  JKCS1_prepare [OPTIONS]
+  
+  ALL OPTIONS:
+    -help ............ print this help and exit
+    -l,-lm \"X\" ....... amount of minima to be saved [def=5000]
+    -g,-gen \"X\" ...... amount of ABC generations [def=100]
+    -s,-sc \"X\" ....... amount of scout bees [def=4]
+    -i,-init \"X\" ..... amount of initial guesses [def=5000]
+    OTHERS: -size
+
+  BASIC EXAMPES:
+    
+    Weak/fast configurational sampling:
+	    JKCS1_prepare -lm 50 -gen 50 -i 500
+    Strong/slow configurational sampling:
+	    JKCS1_prepare -lm 1000 -gen 100 -i 2000
+    Exhausting configurational sampling:
+            JKCS1_prepare -lm 15000 -gen 200 -sc 6 -i 4000
+  """
+
+  exit
+} 
+
+###############################################################################
+################################### SETUP #####################################
+############################### TOUCH MY BODY #################################
+###############################################################################
+
+# initial setup of parameters
+LM=5000
+GEN=100
+INIT=5000
+SC=4
+
+###############################################################################
+################################  USER INPUT  #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+Qprint=0   # 0=no or 1=yes
+next=0
+last=""
+
+# loop over all arguments
+for i in $*
+do
+ if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi 
+ #
+ if [ $next -eq 1 ];
+ then
+   # read argument of parameter
+   if [ "$last" == "-l" ];    then next=0; last=""; LM=$i;   fi
+   if [ "$last" == "-g" ];    then next=0; last=""; GEN=$i;  fi
+   if [ "$last" == "-i" ];    then next=0; last=""; INIT=$i; fi
+   if [ "$last" == "-s" ];    then next=0; last=""; SC=$i;   fi
+   if [ "$last" == "-size" ]; then next=0; last=""; size=$i;sizename="[box size]"; fi
+ else
+   # read paramter name
+   if [ "$i" == "-p" ];                                               then Qprint=1;        fi
+   if [ "$i" == "-l" ] || [ "$i" == "-lm" ]   || [ "$i" == "-LM" ];   then next=1;last="-l";fi
+   if [ "$i" == "-g" ] || [ "$i" == "-gen" ]  || [ "$i" == "-GEN" ];  then next=1;last="-g";fi
+   if [ "$i" == "-i" ] || [ "$i" == "-init" ] || [ "$i" == "-INIT" ]; then next=1;last="-i";fi
+   if [ "$i" == "-s" ] || [ "$i" == "-sc" ]   || [ "$i" == "-SC" ];   then next=1;last="-s";fi
+   if [ "$i" == "-size" ];                                            then next=1;last="-size";fi
+ fi
+done
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+# load functions
+source $toolspath/TOOLSextra/functions.sh 
+
+# load parameters
+source $toolspath/TOOLSextra/loadparameters.sh
+
+###############################################################################
+
+## reading user input file, + checking of its correctness
+check=`grep -c "# name" $userinputfile`
+if [ $check -ne 1 ]; 
+then 
+  echo "$scriptfile: Input format in $userinputfile file has been changed. (”\# name\" error). EXITING"; 
+  exit; 
+fi
+namerow=`grep -n '# name' $userinputfile | awk '{print $1}' | sed 's/[^0-9]//g'`
+
+## read name of components
+molecules=`sed 1,${namerow}d $userinputfile | awk '{print $1}' | uniq | xargs`
+nf=`sed 1,${namerow}d $userinputfile | awk '{print $1}' | xargs`
+
+## does filesABC exist? I WILL NOT REMOVE IT!!
+if [ ! -e $filesfile ]; 
+then 
+  echo -e "#CPU \t INIT \t GEN \t SC \t LM \t FOLDER \t $sizename" > $filesfile
+fi
+
+##############################################################################
+
+## adjusting composition
+echo "$scriptfile: Composition analysis"
+
+#replace bracktes
+for i in $composition;
+do
+  out0=`Cbrackets "$i"`
+  out+=" $out0";
+done;
+composition=$out
+
+#replace dashes
+out=''
+for i in $composition;
+do
+  out0=`Cdash "$i"`
+  out+=" $out0";
+done;
+composition=$out
+
+## loop over all compositions
+cputot=0
+for comp in $composition
+do
+  ### FORMING NAME OF SPECIFIC FOLDER ###
+  # number of each molecular type
+  num0=`echo $comp | sed 's/_/ /g'`
+  numberofmolecules=0
+  for add in $num0; 
+  do 
+    if [[ "${add}" != "F"* ]]
+    then
+      numberofmolecules=`echo $numberofmolecules+$add |bc`;
+    fi
+  done
+  if [ $numberofmolecules -eq 0 ];then continue;fi
+  L=`Felements $molecules`
+  folder=$folderbasename
+  for i in `seq 1 $L`
+  do
+    numero=`echo $num0 | awk -v var=$i '{print $var}'`
+    if [ "$numero" != "0" ] && [[ "${numero}" != "F"* ]]
+    then
+      name=`echo $molecules | awk -v var=$i '{print $var}'`
+      folder+="_${numero}${name}" 
+    fi
+  done
+  if [ -d $folder ]; 
+  then 
+    echo "$scriptfile: Folder $folder already exist. It has been skipped!!!";
+    continue;
+  fi
+  #going to specific directory
+  mkdir $folder
+  cd $folder
+  
+  ###########################################
+  ## In specific directory  
+  
+  # PRINT input // parameters.txt
+  echo "FILES = " `Felements ${nf}` " MOLECULES = $numberofmolecules" > $inputfile
+  sed 1,${namerow}d ../$userinputfile >> $inputfile
+ 
+  #############################
+  # MAIN CYCLE
+  # testing all possible constitution
+  #############################
+  numii=0      # how many loops?
+  saveALL=""   # I will save here what is in saveALL2 after each loop
+  for MOL in $molecules
+  do
+    saveALL2=""                # clear name
+    numii=`echo $numii+1 |bc`  # update amount of loop
+    chain=""                   #clear chain
+    ## code for one type of molecule
+    ################
+    
+    i=`echo $num0 | awk -v var=$numii '{print $var}'` 
+    # checking Qf, does F commands has been used?
+    Qf=0; 
+    if [[ ${i} == "F"* ]]; 
+    then 
+      i=`echo $i | cut -c2-`;
+      Qf=1;
+    fi
+    # states = of onne molecule charges and isomers 
+    states=`sed 1,${namerow}d ../$userinputfile | awk -v var="$MOL" '$1==var' | sort -k 2 | awk '{print $2}' | xargs`
+    #echo states = $states
+    
+    # SUM of states
+    j=`Felements $states` 
+    num=""
+    for addnum in `seq 1 $j`
+    do
+      num+="0 "
+    done
+    #echo num = $num
+    #
+
+    ## now we will loop over all possible states    
+    ## i = has to be SUM
+    fin=0 #end loop?
+    sum=0 #sum over states
+    while [ $fin -eq 0 ]
+    do  
+      # DECLARATION 
+      change=1;  #changing from 1.isommer of molecule
+      changed=0; #changed yet?
+   
+      # TEST
+      #does molecule have some number (It should have everytime)
+      if [ -z "$num" ]; then changed=1;fin=1;fi
+
+      # CHANGE 1 NUMBER
+      #change one number in num ++1
+      while [ $changed -eq 0 ]
+      do
+        actual=`echo $num | awk -v var=$change '{print $var}'` #value of selected number
+        iMAX=`echo $i-$sum+$actual | bc` #maximal possible nnumber (assuming also number of others)     
+        if [ $actual -ge $iMAX ] #if actual equal to number of molecules of specific type
+        then
+          num=`echo $num | awk -v col=$change '{$col=0}1'`
+          change=`echo $change+1 |bc`
+          sum=`echo $sum-$actual | bc`
+          if [ $change -gt $j ]
+          then
+            fin=1
+            changed=1
+          fi
+        else
+          actual=`echo $actual+1 |bc`
+          num=`echo $num | awk -v col=$change -v act=$actual '{$col=act}1'`
+          changed=1
+        fi
+      done   
+
+      #amount of all isomers
+      sum=0
+      for snum in $num
+      do
+        sum=`echo $sum+$snum |bc`
+      done
+      
+      
+      if [ $sum -eq $i ] || [ $Qf -eq 1 ]
+      then
+        numsave=`echo $num | sed -e 's/ /_/g'`
+        if [ -z "$saveALL" ] 
+        then 
+          saveALL2+="${numsave} "
+        else
+          for savei in $saveALL
+          do
+            saveALL2+="${savei}_${numsave} "
+          done
+        fi
+       fi
+    done
+  
+    ###################################
+    saveALL=$saveALL2
+  done
+  
+  #################
+  # CHARGE CHECKING
+  #################
+  TEST1PASSED=""
+  for i in $saveALL
+  do
+    str=`echo $i | sed -e 's/_/ /g'`
+    charge=0
+    molec=0
+    for j in $str
+    do
+      molec=`echo $molec+1 |bc`
+      actcharge=`sed 1,${namerow}d ../$userinputfile | head -n $molec | tail -n 1 | awk '{print $2}' | sed 's/+//'`
+      charge=`echo $charge+$j*$actcharge | bc`    
+    done
+    if [ $totcharge -eq $charge ] 
+    then 
+      TEST1PASSED+="$i "
+    fi
+  done
+  
+  ############
+  # PRINT OUT
+  ############
+  for i in $TEST1PASSED
+  do 
+    echo $i >> $inputfile
+    if [ $Qprint -eq 1 ];then  echo $i;fi
+  done
+  cd ..
+  cpuneed=`Felements $TEST1PASSED`
+  cpuneed=`echo $cpuneed*$cpu | bc`
+  echo -e " $cpuneed \t $INIT \t $GEN \t $SC \t $LM \t $folder \t $size" >> $filesfile
+  cputot=`echo $cputot + $cpuneed | bc`
+  echo "$scriptfile: $folder has been prepared."
+done
+
+# Reporting finish job
+echo "----------------------------------------------------"
+echo "$scriptfile: Total number of CPUs to be used is $cputot"
+echo "$scriptfile: DONE :-)"
+echo "$scriptfile: Now just run JKCS2_runABC"

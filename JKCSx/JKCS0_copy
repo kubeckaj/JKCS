@@ -1,0 +1,242 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program for preparin input file for user setup         ##
+## Nothinng to setup                                      ##
+##        no help included yet                            ##
+############################################################
+## "Nowadays time period should be called silicon era ... ##
+## era of sil. aerosols, el. devices and great boobs." JK ##
+############################################################
+
+###############################################################################
+################################### SETUP #####################################
+############################### TOUCH MY BODY #################################
+###############################################################################
+
+
+###############################################################################
+################################  USER INPUT  #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+function help {
+  echo "THIS IS HELP:"
+  echo "Script copy input files for JKCS to your folder."
+  echo """
+  JKCS0_copy [OPTIONS]
+
+  ALL OPTIONS:
+   -help . print this help and exit
+  +links to some structures and all their protonation states/isomers:
+   W ............ water
+   
+   HNO3 ......... nitric acid
+   SA ........... sulphuric acid
+   MSA .......... methanesulfonic acid
+
+   A,AM ......... ammonia
+   GD ........... guanidine
+   DMA .......... dimethyl ammine
+   TMA .......... trimethyl ammine
+   urea ......... urea
+   
+   CO2 .......... carbon dioxide
+   CH4 .......... methane
+   Ar ........... argone
+   Ne ........... neone
+   He ........... helium 
+  
+   H ............ proton (+)
+   Na ........... sodium (+)
+   Cl ........... chloride (-)
+  
+   HIO3 ......... iodic acid
+   HIO2 ......... iodous acid
+   I2O5 ......... iodine pentoxide
+
+  BASIC EXAMPLES:
+
+	JKCS0_copy SA GD 
+  """
+  exit
+}
+
+opt="$*"
+
+for i in $opt
+do
+  if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi
+done
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+path1="$toolspath/STRUCTURES/ABC"
+path2="$toolspath/STRUCTURES/JACOB"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+###############################################################################
+
+# path control
+if [ ! -d $path1 ] || [ ! -d $path2 ]
+then 
+  echo "$scriptfile: Please, set properly paths in $scriptpath/$scriptfile"
+  echo "             or in $userinputfile file."
+  echo "            IF YOU WILL NOT DO IT, YOU WILL GET ERROR IN NEXT STEPS"
+  echo "--------------------------------------------------------------------"
+fi
+
+# forming file
+echo """#############################################################
+## NUMBER OF PROCESORS PER FOLDER/COMPOSITION (e.g. 1,2,4) ##
+#############################################################
+CPU             1
+
+###########################################
+## TOTAL SYSTEM CHARGE AND MULTIPLICITY  ##
+###########################################
+TotalCharge        0  
+TotalMultiplicity  1  
+
+###################################################################
+## COMPOSITION:                                                  ##
+## e.g.: 1_1_2 1_2_1 1_3                                         ##                                  
+## e.g.: 1_3-6             = 1_3 1_4 1_5 1_6                     ##
+## e.g.: (1,3,5)_1         = 1_1 3_5 5_1                         ##
+## e.g.: (2,4)_1-3_1       = 2_1_1 4_1_1 2_2_1 4_2_1 2_3_1 4_3_1 ## 
+## e.g.: 1_1_F2            = 1_1_0-2 #protons# to fulfill charge ## 
+###################################################################
+Composition     1_1 1_2 1_3
+
+#######################################################################
+## STRUCTURES OF SINGLE MOLECULES:                                   ##
+## number of structure, charge/protonation state, isomeric structure ##
+#######################################################################
+# name | q | i | path //Please do not touch this row (no space behind structures)""" > $userinputfile
+
+function add {
+  what=`echo $1 | awk '{print tolower($0)}'`
+  case ${what} in
+  "a"|"am") echo   "  A      0   $path1/nh3.xyz"         >> $userinputfile
+       echo   "  A      1   $path1/nh4.xyz"         >> $userinputfile
+       ;;
+  "hno3") echo   "  HNO3      0   $path1/hno3.xyz"         >> $userinputfile
+       echo   "  HNO3     -1   $path1/no3.xyz"         >> $userinputfile
+       ;;
+  "sa") echo  "  SA     0   $path1/h2so4.xyz"       >> $userinputfile
+        echo  "  SA     0   $path2/h2so4_cis.xyz"   >> $userinputfile
+        echo  "  SA    -1   $path1/hso4.xyz"        >> $userinputfile
+        echo  "  SA    -2   $path1/so4.xyz"         >> $userinputfile
+        ;;
+  "gd") echo  "  GD     0   $path2/g.xyz"           >> $userinputfile
+        echo  "  GD     1   $path1/guanidinium.xyz" >> $userinputfile
+        ;;
+  "w") echo   "  W     -1   $path1/oh.xyz"          >> $userinputfile
+       echo   "  W      0   $path2/aq.xyz"          >> $userinputfile
+       echo   "  W      1   $path2/aqp.xyz"         >> $userinputfile
+       ;;
+  "msa") echo "  MSA    0   $path2/msa.xyz"         >> $userinputfile
+         echo "  MSA   -1   $path2/msam.xyz"        >> $userinputfile
+         ;;
+  "dma") echo "  DMA    0   $path1/c2h6nh.xyz"      >> $userinputfile
+         echo "  DMA    1   $path2/dmap.xyz"        >> $userinputfile
+         ;;
+  "co2") echo "  CO2    0   $path1/co2.xyz"         >> $userinputfile
+         ;;
+  "ch4") echo "  CH4    0   $path1/ch4.xyz"         >> $userinputfile
+         ;;
+  "ar") echo  "  Ar     0   $path1/ar.xyz"          >> $userinputfile
+        ;;
+  "he") echo  "  He     0   $path1/he.xyz"          >> $userinputfile
+        ;;
+  "cl") echo  "  Cl    -1   $path1/cl.xyz"          >> $userinputfile
+        ;;
+  "na") echo  "  Na     1   $path1/na.xyz"          >> $userinputfile
+        ;;
+  "ne") echo  "  Ne     0   $path1/ne.xyz"          >> $userinputfile
+        ;;
+  "urea") echo   "  urea   0   $path1/urea.xyz"     >> $userinputfile
+       ;;
+  "h") echo   "  H      1   $path1/h.xyz"           >> $userinputfile
+       ;;
+  "tma") echo "  TMA    0   $path2/tma.xyz"         >> $userinputfile
+         echo "  TMA    1   $path2/tmap.xyz"        >> $userinputfile
+         ;;
+  "hio3") echo "  HIO3   0   $path2/hio3.xyz"         >> $userinputfile
+         echo "  HIO3  -1   $path2/io3.xyz"        >> $userinputfile
+         ;;
+  "hio2") echo "  HIO2   0   $path2/hio2.xyz"         >> $userinputfile
+         ;;
+  "i2o5") echo "  I2O5   0   $path2/i2o5.xyz"         >> $userinputfile
+         ;;
+  *) echo "$scriptfile: error input: argument does not exist [EXITING]"
+     exit
+     ;;
+  esac
+}
+
+for i in $opt
+do
+  if [ "$i" == "-all" ]
+  then
+    add "W"
+
+    add "HNO3"
+    add "SA"
+    add "MSA"
+
+    add "A"
+    add "GD"
+    add "DMA"
+    add "TMA"
+    add "urea"
+
+    add "CO2"
+    add "CH4"
+    add "Ar"
+    add "Ne"
+    add "He"
+
+    add "H"
+    add "Cl"
+    add "Na"
+
+    add "HIO3"
+    add "HIO2"
+    add "I2O5"
+    continue
+  else
+    add $i
+  fi
+done
+if [ -z "$opt" ]
+then
+  add "A"
+  add "SA"
+fi
+
+#preparing command file
+echo """#sequence of commands for JKCS (Jammy Key for Configuration Sampling) //JKCS1_prepare has to be already finished
+JKCS2_runABC                 
+JKCS3_runXTB                 
+JKCS4_collect XTB -dip            
+JKCS7_filter resultsXTB.dat -c3 4 -rgm 3 -dm 3.5 -sm 80
+JKCS5_runDFT -f \"DFT_HIGH\" -m \""# wb97xd 6-31++g** opt=verytight int=ultrafine gfinput IOP\(6\/7\=1\)"\"
+JKCS4_collect DFT_HIGH       
+JKCS7_filter resultsDFT_HIGH.dat -dm 1.7
+JKCS5_runDFT -f \"DFT_HIGH_freq\" -r \"DFT_HIGH\" -m \""# wb97xd 6-31++g** freq gfinput IOP\(6\/7\=1\)"\"
+JKCS4_collect DFT_HIGH_freq -gibbsh
+JKCS7_filter  resultsDFT_HIGH_freq.dat -c2 4 -d 1 """ > $commandsfile
+
+# reporting finished job
+echo "$scriptfile: File $userinputfile has been copied to this folder."
+echo "$scriptfile: Change it and then run JKCS1_prepare"

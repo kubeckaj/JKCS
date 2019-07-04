@@ -1,0 +1,421 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program that collect your results from JKCS folders    ##
+## To understand program run help:                        ##
+##       for help use arguement -help                     ##
+############################################################
+## "It's funny that I can call on girlfrien Lol, she does ##
+## not know if I am laughing at her."       Jakub Kubecka ##
+############################################################
+
+### THIS IS HELP
+function help {
+  echo "THIS IS HELP:"
+  echo "Program that collect your results from JKCS folders"
+  echo """
+  JKCS4_collect [FOLDER] [OPTIONS]
+
+  ALL OPTIONS:
+   -help ............ print this help and exit
+   [FOLDER] ......... from which are data collected [default: XTB]
+   -dlpno ........... needs files from -dlpno1 & -dlpno2
+   -dlpno1 \"X\" ...... set dlpno file [default: resultsDLPNO.dat]
+   -dlpno2 \"X\" ...... set free energy file [default: resultsDFT_HIGH_freq.dat]
+   New Colective Coordinates: (3rd column)
+   -ncc ............. + something assuming hydrogen bond lengths
+   -dip ............. + dipoles
+   -g,-gibbs ........ + Gibbs free energy
+   -gh,-gibbsh ...... + Gibbs free energy (GoodVibes)
+   -b,-bonds [ATOM] [thresh] .................... ++ amount of bonds with spec. atom
+   -b2,-bonds2 [ATOM1] [ATOM2] [thresh] ......... ++ amount of bonds with spec. atoms
+   -b3,-bonds3 [ATOM1] [ATOM2] [ATOM3] [thresh] . ++ amount of bonds with spec. atoms
+   OTHERS: -time, -time1, -time2, -programs, -partition(-par)
+           
+
+  BASIC EXAMPLES:
+    
+    JKCS4_collect DFT_HIGH_freq -gibbs
+    JKCS4_collect XTB -time 1:00:00
+    JKCS4_collect DFT_HIGH -programs 2
+
+  """
+  exit
+}
+
+###############################################################################
+################################  USER INPUT  #################################
+################################ DO NOT TOUCH #################################
+################################################################################
+
+method=XTB
+QJKsend=0
+Qcheck=0                   
+Qprograms=programs.txt    # where to take script parameters
+Qncc=0                    # calculate and collect new collective variable
+Qncc2=0
+Qncc2a=""
+Qncc2b=""
+Qncc2c=""
+Qncc2d=""
+#collect all
+Qdlpno=0                         # values from resultsDLPNO.dat and resultsDFT_HIGH_freq.dat
+Qdlpno1=resultsDLPNO.dat         # values from resultsDLPNO.dat and resultsDFT_HIGH_freq.dat
+Qdlpno2=resultsDFT_HIGH_freq.dat # values from resultsDLPNO.dat and resultsDFT_HIGH_freq.dat
+
+# loop over all arguments
+for i in $*
+do
+  if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi
+  # programs
+  if [ "$last" == '-programs' ]
+  then
+    last='' 
+    if [ "$i" == 2 ]
+    then
+      Qprograms="programs2.txt"
+    else
+      Qprograms="$i"
+    fi
+    continue
+  fi
+  if [ "$i" == "-programs" ]
+  then
+    last='-programs'
+    continue
+  fi
+  ###
+  if [ "$i" == "ABC" ] || [ "$i" == "-abc" ] || [ "$i" == "-ABC" ]
+  then
+    method=ABC
+    continue
+  fi
+  if [ "$i" == "-pm7" ] || [ "$i" == "-PM7" ]
+  then
+    method=PM7
+    continue
+  fi
+  if [ "$i" == "-lowdft" ] || [ "$i" == "-LOWDFT" ]
+  then
+    method=LOWDFT
+    continue
+  fi
+  ###
+  if [ "$i" == "-gibbs" ] || [ "$i" == "-g" ]
+  then
+    Qncc=3
+    continue
+  fi
+  ###
+  if [ "$i" == "-gibbsh" ] || [ "$i" == "-gh" ]
+  then
+    Qncc=4
+    continue
+  fi
+  ###
+  if [ "$i" == "-dlpno" ] 
+  then
+    Qdlpno=1
+    continue
+  fi
+  ###
+  if [ "$last" == "-dlpno1" ]
+  then
+    Qdlpno1=$i
+    last=""
+    continue
+  fi
+  if [ "$i" == "-dlpno1" ]
+  then
+    last="-dlpno1"
+    continue
+  fi
+  ### atom bonds3
+  if [ "$last" == "-bonds3" ]; then
+    Qncc2=5; Qncc2a="$i"; last="-bonds3s"; continue
+  fi
+  if [ "$last" == "-bonds3s" ]; then
+    Qncc2b="$i"; last='-bonds3ss'; continue
+  fi
+  if [ "$last" == "-bonds3ss" ]; then
+    Qncc2c="$i"; last='-bonds3sss'; continue
+  fi
+  if [ "$last" == "-bonds3sss" ]; then
+    Qncc2d="$i"; last=''; continue
+  fi
+  if [ "$i" == "-bonds3" ] || [ "$i" == "-b3" ]; then
+    last="-bonds3"; continue
+  fi
+  ### atom bonds2
+  if [ "$last" == "-bonds2" ]; then
+    Qncc2=5; Qncc2a="$i"; last="-bonds2s"; continue
+  fi
+  if [ "$last" == "-bonds2s" ]; then
+    Qncc2b="$i"; last='-bonds2ss'; continue
+  fi
+  if [ "$last" == "-bonds2ss" ]; then
+    Qncc2c="-"; Qncc2d="$i"; last=''; continue
+  fi
+  if [ "$i" == "-bonds2" ] || [ "$i" == "-b2" ]; then
+    last="-bonds2"; continue
+  fi
+  ### atom bonds
+  if [ "$last" == "-bonds" ]
+  then
+    Qncc2=5
+    Qncc2a="$i"
+    last="-bondss" 
+    continue
+  fi
+  if [ "$last" == "-bondss" ]
+  then
+    Qncc2d="$i"
+    Qncc2c="-"
+    Qncc2b="-"
+    last=''
+    continue
+  fi
+  if [ "$i" == "-bonds" ] || [ "$i" == "-b" ]
+  then
+    last="-bonds"
+    continue
+  fi
+  ###
+  if [ "$last" == "-dlpno2" ]
+  then
+    Qdlpno2=$i
+    last=""
+    continue
+  fi
+  if [ "$i" == "-dlpno2" ]
+  then
+    last="-dlpno2"
+    continue
+  fi
+  ###
+  if [ "$i" == "-short" ]
+  then
+    parameters+=" --time 2:00:00"
+    Qwalltime=1
+    continue
+  fi
+  ###
+  if [ "$i" == "-ncc" ] 
+  then
+    Qncc=1
+    continue
+  fi
+  ###
+  if [ "$i" == "-dip" ] 
+  then
+    Qncc=2
+    continue
+  fi
+  # partition
+  if [ "$last" == '-par' ]
+  then
+    last=''
+    parameters+=" -p $i"
+    Qpartition2="$i"
+    continue
+  fi
+  if [ "$i" == "-par" ] || [ "$i" == "-partition" ]
+  then
+    last="-par"
+    continue
+  fi
+  ###
+  if [ "$last" == "-time" ]
+  then
+    time="$i"
+    #o=`echo "$time" | awk -F: '{print $3}'`; if [ -z "$o" ]; then time="00:"$time; fi
+    #o=`echo "$time" | awk -F: '{print $3}'`; if [ -z "$o" ]; then time="00:"$time; fi
+    #timeH=`echo $time | awk -F: '{ print ($1) + ($2 / 60.0) + ($3/3600.0) }'`
+    #test=`echo "($timeH > 72.0)" | bc -l`;
+    #if [ $test -eq 1 ]
+    #then
+    #  parameters+=" -p longrun --time $i" 
+    #else
+      parameters+=" --time $i"
+    #fi
+    Qwalltime=1
+    last=""
+    continue
+  fi
+  if [ "$i" == "-time" ] || [ "$i" == "-t" ]
+  then
+    last="-time"
+    continue
+  fi
+  # folder
+  L4=`echo $i | cut -c1-4`
+  if [ -d "$i" ] && [ "$L4" == "SYS_" ]
+  then
+    folders+=" $i"
+    continue
+  fi
+  ###
+  method="${i%/*}"  # It is checked later if some folder with name method exist. + "/" is removed immidiately
+done
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+# load functions
+source $toolspath/TOOLSextra/functions.sh
+
+# load parameters
+source $toolspath/TOOLSextra/loadparameters.sh
+
+parameters2=$parameters
+# programs
+source $toolspath/../$Qprograms
+parameters+=" $parameters2"
+
+###############################################################################
+
+savefile="$collectionfile${method}.txt"
+resultfile="$resultsfile${method}.dat"
+movie="$moviefile${method}.xyz"
+
+###################################################
+### LOOP OVER ALL FOLDERS
+###################################################
+for folder in $folders
+do
+  cd $folder
+  echo "$scriptfile: Entering folder $folder"
+  # Check if the folder exists at all?
+  if [ ! -d $addition ]
+  then
+    echo "$scriptfile: $addition does not exist."
+    cd ..
+    continue
+  fi 
+    
+  ### IF DLPNO FIN #############################################
+  if [ $Qdlpno -eq 1 ]
+  then
+    #test Qdlpno1 extension
+    ext=`echo $Qdlpno1 | rev | cut -c1-4 | rev`
+    if [ "$ext" == ".dat" ]
+    then
+      file1=$Qdlpno1
+      f1=collection`echo $(basename $Qdlpno1 .dat) | cut -c8-`.txt
+      f2=collection`echo $(basename $Qdlpno2 .dat) | cut -c8-`.txt
+    else
+      file1=$Qdlpno1
+      f1=$Qdlpno1
+      f2=$Qdlpno2
+    fi
+    /#for all lines
+    lines=`cat $file1 | wc -l`
+    for i in `seq 1 $lines`
+    do
+      file=`head -n $i $f1 | tail -n 1 | awk '{print $1}'`
+      filename=`echo ${file#*calc-LM}`;
+      DFTel=`grep $filename $f2 | awk '{print $3}'`
+      DFTg=` grep $filename $f2 | awk '{print $4}'`
+      DLPNO=`head -n $i $f1 | tail -n 1 | awk '{print $3}'`
+      dG=`echo "$DLPNO+($DFTg-1.0*$DFTel)" | bc -l`
+      echo " $file || $DFTel $DFTg $DLPNO || $dG "
+    #
+    done
+    continue
+  fi   
+  #############################################################
+ 
+  if [ ! -e $savefile ]; then touch $savefile;fi
+  if [ -e $resultfile ]; then rm $resultfile;fi
+ 
+  #constitutions 
+  if [ ! -d ${method} ]
+  then
+    echo "$scriptfile: ${method} folder does not exist in folder $folder. Continuing to another folder."
+    cd ..
+    continue
+  fi
+  if [ -d ${method}/${name}-LM ]
+  then 
+    constitutions="justonce"
+  else
+    Nfiles=`grep "FILES =" $inputfile | awk '{print $3}'`
+    Nfilesp1=`echo $Nfiles + 1 | bc`
+    constitutions=`sed 1,${Nfilesp1}d $inputfile | xargs`
+  fi
+  #################################################
+  tocontrol=""
+
+  for i in $constitutions
+  do
+    if [ -d ${method}/${name}-LM ]
+    then
+      folder=${method}/${name}-LM
+      #back="../../"
+    elif [ -d ${method}/${method}_${i}/${name}-LM ]
+    then
+      folder=${method}/${method}_${i}/${name}-LM
+      #back="../../../"
+    else
+      echo "$scriptfile: $method[$constitutions] does not exist."
+      continue
+    fi
+    ## ENTERING FOLDER
+    cd $folder
+    echo "$scriptfile: Analyzing folder $folder"
+    
+ 
+    #################################################################
+    # command
+    command="$toolspath/TOOLSextra/JKcollect $Qprograms RUN $method $savefile $Qncc $Qncc2 $Qncc2a $Qncc2b $Qncc2c $Qncc2d"
+    #echo $command
+    # checking queue program
+    if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+    then
+      parameters=""
+      # calculate
+      sh -c "$command"
+    else
+      # calculate ... send to queue
+      queue=`eval $programSendToQueue1part $parameters $programSendToQueue2part "$command"`
+      echo "$scriptfile: $queue"
+      tocontrol+=" `echo $queue | awk '{print $4}'`"
+    fi
+    ######################    
+
+    cd - > /dev/null
+  done
+ 
+  echo "$scriptfile: Sending to CONTROL collection." 
+  echo "in $PWD" 
+  ######################
+  # command
+  command="$toolspath/TOOLSextra/JKcollect $Qprograms CONTROL $method $savefile $Qncc $resultfile $movie"
+  # checking queue program
+  if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+  then
+    parameters=""
+    touch collectqueuetocontrolfile$method
+    # calculate
+    sh -c "$command"
+  else
+    # calculate ... send to queue
+    echo $tocontrol > collectqueuetocontrolfile$method
+    queue=`eval $programSendToQueue1part $parameters $programSendToQueue2part "$command"`
+    echo "$scriptfile: $queue"
+    echo $queue | awk '{print $4}' >> $queuefile
+  fi
+  ######################    
+
+  cd ..
+done
+echo "$scriptfile: Done :-D"

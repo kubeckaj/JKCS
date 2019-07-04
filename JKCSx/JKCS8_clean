@@ -1,0 +1,117 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program that clean all mess (also .log etc) after JKCS ##
+## To understand program run help:                        ##
+##        -- no help, just internal setup --              ##
+############################################################
+## "I love travelling. And, I have seen plenty of people  ##
+## in the world. Missing my friends." Jakub Kubecka (2019)##
+############################################################
+function help {
+  echo "NO HELP:"
+  exit
+}
+
+if [ "$1" == "-help" ] || [ "$1" == "--help" ]; then help; exit; fi
+
+inputfile0=input.txt
+inputfile=parameters.txt
+filesfile=filesABC.dat
+queuefile=queue.dat
+name=calc
+scriptfile=JKCS8_clean
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+# FUNCTION: CALCULATE NUMBER OF ELEMENTS
+Felements () {
+  N=0
+  for i in $*
+  do
+     N=`echo $N+1 |bc`
+  done
+  echo $N
+}
+###################################
+## CHECK IN WHICH DIRECTORY I AM 
+## + load info about charge and cpu
+###################################
+if [ -e $filesfile ]
+then
+  folders=`sed 1,1d $filesfile | awk '{print $6}' | xargs`
+  allCPU=`sed 1,1d $filesfile | awk '{print $1}' | xargs`
+  totcharge=`grep TotalCharge $inputfile0 | awk '{print $2}'`
+else
+  if [ -e $inputfile ]
+  then
+    folders=./
+    thisdir=`echo "${PWD##*/}"`
+    # !!! spaces arounnd $thisdir are vey important
+    testfolder=`grep -c " $thisdir " ../$filesfile`
+    if [ "$testfolder" != 1 ]
+    then
+      echo "$program: This directory is missing in " $filesfile "EXITING"
+      exit
+    fi
+    allCPU=`grep " $thisdir " ../$filesfile | awk '{print $1}'`
+    totcharge=`grep TotalCharge ../$inputfile0 | awk '{print $2}'`
+  else
+    echo "$program: You are not in correct folder. EXITING"
+    exit
+  fi
+fi
+
+
+##################################
+## LOOP OVER ALL FOLDERS
+##################################
+for folder in $folders
+do
+  echo "$scriptfile: `echo "${PWD##*/}"`: Entering folder $folder"
+  if [ ! -d $folder ]; then echo "$scriptfile: Some problem in reading directory $folder"; exit ; fi
+  cd $folder
+  ###
+  echo "$scriptfile: rm -r *ABC*"
+  rm -r *ABC* 2> /dev/null
+  #
+  echo "$scriptfile: rm -r *XTB*"
+  rm -r *XTB* 2> /dev/null
+  #
+  echo "$scriptfile: rm -r *PM7*"
+  rm -r *PM7* 2> /dev/null
+  #
+  echo "$scriptfile: rm folders in DLPNO"
+  if [ -d DLPNO ]
+  then
+    cd DLPNO/calc-LM
+    dlpnofiles=`ls -d * 2> /dev/null | xargs`
+    rm -r $dlpnofiles 2> /dev/null
+    cd ../..
+  fi
+  #
+  echo "$scriptfile: rm -r DFT_HIGH ?? if -e DFT_HIGH_freq"
+  if [ -e DFT_HIGH_freq ]
+  then
+    if [ -e DFT_HIGH ]
+    then
+      rm -r DFT_HIGH 2> /dev/null
+    fi
+  fi
+  #
+  echo "$scriptfile: rm *err* core.* output *queue* *cmd* *.xyz"
+  for i in "*err*" "core.*" "output" "*queue*" "*cmd*" "*.xyz"
+  do
+    find * -iname $i >> filestoberemoved 2> /dev/null 
+  done  
+  sed -i 's_.*_rm &_' filestoberemoved
+  sh filestoberemoved 2> /dev/null
+  rm filestoberemoved 
+  #
+  echo "$scriptfile: folder $folder cleaned: "`du -sh ../$folder`
+  echo "-------------------------------------------------------" 
+  ### 
+  cd ..
+done

@@ -1,0 +1,228 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## This program start the ABCluster bussiness             ##
+## To adjust program just change setup                    ##
+##       for help use arguement -help                     ##
+############################################################
+## "If I should show 1 equation, it would be:exp(iPi)-1=0 ##
+## Contains all magic numbers (0,1,-1,Pi,i)."Jakub Kubecka##
+############################################################
+
+### THIS IS HELP
+function help {
+  echo "THIS IS HELP:"
+  echo "This program start the ABCluster bussiness"
+  echo """
+  JKCS2_runABC [OPTIONS]
+  
+  ALL OPTIONS:
+    -help ............ print this help and exit
+    OTHERS: -time(-t), -partition(-par), -programs, -short 
+
+  BASIC EXAMPLES:
+    
+    JKCS2_runABC
+
+  """ 
+  exit
+}
+
+###############################################################################
+################################  USER INPUT  #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+Qprograms=programs.txt
+
+# loop over all arguments
+for i in $*
+do 
+  if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi
+  # partition 
+  if [ "$last" == '-par' ]
+  then
+    last=''
+    parameters+=" -p $i"
+    continue
+  fi
+  if [ "$i" == "-par" ] || [ "$i" == "-partition" ]
+  then
+    last="-par"
+    continue
+  fi
+  # time 
+  if [ "$last" == '-time' ]
+  then
+    last=''
+    parameters+=" --time $i"
+    continue
+  fi
+  if [ "$i" == "-time" ] || [ "$i" == "-t" ]
+  then
+    last="-time"
+    continue
+  fi
+  # short
+  if [ "$i" == "-short" ]
+  then
+    parameters+=" --time 2:00:00"
+    continue
+  fi
+  # programs
+  if [ "$last" == '-programs' ]
+  then
+    last=''
+    if [ "$i" == 2 ]
+    then
+      Qprograms="programs2.txt"
+    else
+      Qprograms="$i"
+    fi
+    continue
+  fi
+  if [ "$i" == "-programs" ]
+  then
+    last='-programs'
+    continue
+  fi
+  # folder
+  L4=`echo $i | cut -c1-4`
+  if [ -d "$i" ] && [ "$L4" == "SYS_" ]
+  then
+    folders+=" $i"
+    continue
+  fi
+  # nothing correspond? --> EXIT
+  echo "Probably some mistake in argument $i. [EXITING]"
+  exit
+done
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+# load functions
+source $toolspath/TOOLSextra/functions.sh
+
+# load parameters
+source $toolspath/TOOLSextra/loadparameters.sh
+
+parameters2=$parameters
+# programs
+source $toolspath/../$Qprograms
+parameters+=" $parameters2"
+
+###############################################################################
+
+numfolder=0
+for folder in $folders
+do
+  # reading parameters for specific folder
+  echo "$scriptfile: Entering folder $folder"
+  numfolder=`echo $numfolder+1 |bc` 
+  CPU=`        echo $allCPU         | awk -v var=$numfolder '{print $var}'`
+  INIT=`       echo $allINIT        | awk -v var=$numfolder '{print $var}'`
+  GENERATIONS=`echo $allGENERATIONS | awk -v var=$numfolder '{print $var}'`
+  SCOUTS=`     echo $allSCOUTS      | awk -v var=$numfolder '{print $var}'`
+  LMs=`        echo $allLMs         | awk -v var=$numfolder '{print $var}'`
+  SIZEs=`      echo $allSIZEs       | awk -v var=$numfolder '{print $var}'`
+  cd $folder
+  
+  # constitutionns and parameters
+  Nfiles=`grep "FILES =" $inputfile | awk '{print $3}'`
+  Nfilesp1=`echo $Nfiles + 1 | bc`
+  constitutions=`sed 1,${Nfilesp1}d $inputfile | xargs`
+  files=`head -n ${Nfilesp1} $inputfile | tail -n ${Nfiles} | awk '{print $4}' | xargs`
+  count=`Felements $constitutions`
+  if [ $count -eq 0 ]; 
+  then
+    echo "$scriptfile: Nothing to do in folder $folder"
+    cd ..
+    continue
+  fi
+  CPU=`echo $CPU/$count | bc`
+  if [ $CPU -gt 8 ]; then CPU=8; fi
+  if [ $CPU -gt 1 ];
+  then
+    parameters+=" -n $CPU"
+  fi
+
+  # creating ABC
+  if [ ! -d ABC ]; then mkdir ABC; fi
+  cd ABC 
+  echo "$scriptfile: constitutions = $constitutions" 
+  for i in $constitutions
+  do
+    ####################
+    ### CREATING PATH
+    folder=ABC_$i
+    if [ -d $folder ]; 
+    then 
+      echo "$scriptfile: $folder already exist"; 
+      continue
+    fi
+    mkdir $folder
+    cd $folder
+    #####################
+    ### SIZE CALCULATION
+    # this is not maybe optimal and should be adjust inn future
+    if [ -z "$SIZEs" ]
+    then
+      SIZE=7
+      for j in `echo $i | sed -e 's/_/ /g'`  
+      do
+        SIZE=`echo $SIZE+$j|bc`
+      done
+    else
+      SIZE=$SIZEs
+    fi
+    ######################
+    ### CREATE name.CLUSTER
+    echo $Nfiles >> $F1
+    for var in `seq 1 $Nfiles`
+    do
+      num=`echo $i | sed -e 's/_/ /g' | awk -v var0=$var '{print $var0}'`
+      path=`echo $files | awk -v var0=$var '{print $var0}'` 
+      echo $path $num >> $F1
+    done
+    echo "* $SIZE" >> $F1
+    ######################
+    ### CREATE name.INP
+    echo -e  "$F1 \t # file containing monomers " >> $F2
+    echo -e  "$INIT \t # initial amount of random configurations" >> $F2
+    echo -e  "$GENERATIONS \t # ammount of generations (loops)" >> $F2
+    echo -e  "$SCOUTS \t # amount of scout bees (survival value)" >> $F2
+    echo -e  "$SIZE \t # size of sampling box" >> $F2
+    echo -e  "$name \t # name of output folder" >> $F2
+    echo -e  "$LMs \t # amount of Local Minima to be saved" >> $F2 
+    ######################
+    # command
+    command="$rigidmoloptimizer ${name}.inp > ${name}.out"
+    
+    echo "$command" > run${scriptfile}.sh
+    # checking queue program
+    if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+    then 
+      parameters=""
+      # calculate
+      sh run${scriptfile}.sh
+    else
+      # calculate ... send to queue
+      #echo $programSendToQueue1part $parameters $programSendToQueue2part \""$command"\"
+      queue=`eval $programSendToQueue1part $parameters $programSendToQueue2part sh run${scriptfile}.sh`
+      echo "$scriptfile: $queue"
+      echo $queue | awk '{print $4}' >> ../../$queuefile
+    fi
+    cd ..
+  done
+  cd ../..
+done

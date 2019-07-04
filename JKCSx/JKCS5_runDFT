@@ -1,0 +1,675 @@
+#!/bin/bash
+############################################################
+## JAKUB KUBECKA 2018                                     ##
+## Program that runs DFT out of another folder            ## 
+## To understand program run help:                        ##
+##       for help use arguement -help                     ##
+############################################################
+## "Today I have pain in my back ... that is all."        ##
+##                                          Jakub Kubecka ##
+############################################################
+
+### THIS IS HELP
+function help {
+  echo "THIS IS HELP:"
+  echo "Automatized program for creating DFT calculations"
+  echo """
+  JKCS5_runDFT [OPTIONS] 
+  
+  ALL OPTIONS:
+   -help ............ print this help and exit
+   -f,-folder \"X\" ... name of folder [default=DFT]
+   -m,-method \"X\" ... calculation method used by quantum program (or XTB)
+   -r,-results \"X\" .. instead of resultsXTB.dat uses results\"X\".dat
+   -pm7 ............. instead of resultsXTB.dat uses resultsPM7.dat
+   -abc ............. instead of resultsXTB.dat uses resultsABC.dat   
+   -p,-program \"X\" .. quantum program you would like to use 
+   -d,-diff \"X\" ..... allowed energy difference
+   -o,-old \"X\" ...... (check also -r) name of old folder (you can use -pm7 or -xtb)
+     ( + OTHERS: -repeat \"X\",-feed \"X\",-maxjobs \"X\",-cpu \"X\"         ) 
+     ( max_amount_of_cpu = feed * maxjobs * cpu (+1 for this script) )
+     ( default: 400(401) =   1  *    50   *  8  (+1                ) )
+     ( ... -time1,-time2, (or both -time(-t))                        )
+     ( ... -par1, -par2,  (or both -partition(-par))                 )
+     ( -addbase \"ATOM\" )
+  
+  ADVANCED EXAMPLES:
+     JKCS5_runDFT
+     JKCS5_runDFT -pm7
+     JKCS5_runDFT -f \"DFT_SP\" -m \""# wb97xd 6-31++g**"\"
+     JKCS5_runDFT -o \"DFT_SP\" -f \"DFT_HIGH\" -m \""# wb97xd 6-31++g** opt=verytight int=ultrafine freq gfinput IOP\(6\/7\=1\)"\"
+     JKCS5_runDFT -p DLPNO -r DFT_HIGH_freq -f DLPNO -m \"-fast\"
+     JKCS5_runDFT -f DFT_OPT -r ABC -m \""# wb97xd def2SVP opt int=ultrafine gfinput IOPi\(6\/7\=1\)"\"
+     JKCS5_runDFT -p DLPNO -r DFT_HIGH_freq -f DLPNO    -m \""-large"\" 
+     JKCS5_runDFT -p DLPNO -r DFT_HIGH_freq -f DLPNO    -m \""-fast"\"
+     JKCS5_runDFT -p XTB   -r XTB           -f XTB_freq -m \""-ohess"\" -feed 20 -maxjobs 100
+     JKCS5_runDFT -results XTB -folder DFT -addbase I -m \""#wb97xd GEN Pseudo=Read Opt Int=UltraFine Freq MaxDisk=32GB\"" -mem 12GB -cpu 16 
+
+  BASIC EXAMPLES:
+    
+    OPTIMIZATION
+     JKCS5_runDFT -f DFT_HIGH      -r XTB            -m \""# wb97xd 6-31++g** opt=verytight"\"
+    FREQUENCIES
+     JKCS5_runDFT -f DFT_HIGH_freq -r DFT_HIGH       -m \""# wb97xd 6-31++g** freq Temperature=298.15 gfinput IOP\(6\/7\=1\)"\"
+    ELECTRONIC CORRECTIONS
+     JKCS5_runDFT -f DLPNO         -r  DFT_HIGH_freq -p DLPNO 
+  """
+  exit
+}
+
+
+###############################################################################
+################################### SETUP #####################################
+############################### TOUCH MY BODY #################################
+###############################################################################
+
+MULTIPLICITY=1
+
+###################
+### BASIC SETUP ###
+###################
+
+### MAXIMUM JOBS RUNNING IN ONE TIME 
+MAXJOBS=50
+#did user changed maxjobs
+Qmaxjobs=0
+
+#how many times repeat in case of fail
+REPEAT=0
+
+#feeding one job 
+feeding=1
+#did user changed feeding?
+Qfeeding=0  
+
+#CPU per job
+CPU=8
+
+###########################################################
+################   USER INPUT   ###########################
+################  DO NOT TOUCH  ###########################
+###########################################################
+
+### NEW FOLDER
+folderNEW=DFT
+
+### METHOD 
+method="# wb97xd 6-31+g* opt"
+
+# from what
+addition="XTB"
+
+# whoch program XTB,G16,ORCA,DLPNO
+program="G16"
+
+# are we taking from some file or from some folder?
+QfromfolderOLD=0
+# just testing user input
+Qtestboth=0
+
+######################
+
+#how long run JKrun
+#Qtime1 xxx
+
+#how long run each job
+Qtime2='72:00:00'
+
+#check energy difference?
+Qdiff=0
+
+#user's programs
+Qprograms=programs.txt
+
+MEMORY="4000mb"
+addmemory=" -mem $MEMORY "
+
+parameters=''
+# loop over all arguments
+for i in "$@"
+do
+  if [ "$i" == "-help" ] || [ "$i" == "--help" ]; then help;exit;fi
+  firstletter=`echo $i | cut -c 1`
+  if [ "$firstletter" == "-" ] || [ $next -eq 1 ]
+  then
+    # feeding
+    if [ "$last" == '-mem' ]
+    then
+      MEMORY="$i"
+      if [ "$MEMORY" == "NO" ] || [ "$MEMORY" == "No" ] || [ "$MEMORY" == "no" ]
+      then
+        addmemory=""
+      else
+        addmemory="-mem $MEMORY"
+      fi
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-mem" ]
+    then
+      last='-mem'
+      next=1
+      continue
+    fi
+    # feeding
+    if [ "$last" == '-cpu' ]
+    then
+      CPU="$i"
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-cpu" ]
+    then
+      last='-cpu'
+      next=1
+      continue
+    fi
+    # feeding
+    if [ "$last" == '-maxjobs' ]
+    then
+      MAXJOBS="$i"
+      Qmaxjobs=1
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-maxjobs" ]
+    then
+      last='-maxjobs'
+      next=1
+      continue
+    fi
+    # feeding
+    if [ "$last" == '-feed' ]
+    then
+      feeding="$i"
+      Qfeeding=1
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-feed" ]
+    then
+      last='-feed'
+      next=1
+      continue
+    fi
+    # repeat
+    if [ "$last" == '-repeat' ]
+    then
+      REPEAT="$i"
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-repeat" ]
+    then
+      last='-repeat'
+      next=1
+      continue
+    fi
+    # addbase
+    if [ "$last" == '-addbase' ]
+    then
+      addbase="-addbase $i"
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-addbase" ] || [ "$i" == "-add" ] || [ "$i" == "-bs" ]
+    then
+      last='-addbase'
+      next=1
+      continue
+    fi
+    # partition 1
+    if [ "$last" == '-par1' ]
+    then
+      last=''
+      parameters+=" -p $i"
+      next=0
+      continue
+    fi
+    if [ "$i" == "-par1" ] || [ "$i" == "-partition1" ]
+    then
+      last="-par1"
+      next=1
+      continue
+    fi
+    # partition 2
+    if [ "$last" == '-par2' ]
+    then
+      last=''
+      Qpartition2="$i"
+      next=0
+      continue
+    fi
+    if [ "$i" == "-par2" ] || [ "$i" == "-partition2" ]
+    then
+      last="-par2"
+      next=1
+      continue
+    fi
+    # partition
+    if [ "$last" == '-par' ]
+    then
+      last=''
+      parameters+=" -p $i"
+      Qpartition2="$i"
+      next=0
+      continue
+    fi
+    if [ "$i" == "-par" ] || [ "$i" == "-partition" ]
+    then
+      last="-par"
+      next=1
+      continue
+    fi
+    # time
+    if [ "$last" == '-time' ]
+    then
+      parameters+=" --time $i"
+      Qtime2="$i"
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-time" ] || [ "$i" == "-t" ]
+    then
+      last='-time'
+      next=1
+      continue
+    fi
+    # -short
+    if [ "$i" == '-short' ]
+    then
+      parameters+=" --time 2:00:00"
+      continue
+    fi
+    # time1
+    if [ "$last" == '-time1' ]
+    then
+      parameters+=" --time $i"
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-time1" ] || [ "$i" == "-t1" ]
+    then
+      last='-time1'
+      next=1
+      continue
+    fi
+    # time2
+    if [ "$last" == '-time2' ]
+    then
+      Qtime2="$i"
+      last=''
+      next=0
+      continue
+    fi
+    if [ "$i" == "-time2" ] || [ "$i" == "-t2" ]
+    then
+      last='-time2'
+      next=1
+      continue
+    fi
+    ### -folder "X"
+    if [ "$last" == "-folder" ]
+    then
+      folderNEW=$i
+      last=""
+      next=0
+      continue
+    fi
+    if [ "$i" == "-folder" ] || [ "$i" == "-f" ]
+    then
+      next=1
+      last="-folder"
+      continue
+    fi
+    ### -old "X"
+    if [ "$last" == "-old" ]
+    then
+      folderOLD=$i
+      QfromfolderOLD=1
+      Qtestboth=`echo $Qtestboth+1 |bc`
+      last=""
+      next=0
+      continue
+    fi
+    if [ "$i" == "-old" ] || [ "$i" == "-o" ]
+    then
+      next=1
+      last="-old"
+      continue
+    fi
+    ### -method "X"
+    if [ "$last" == "-method" ]
+    then
+      method="$i"
+      last=""
+      next=0
+      continue
+    fi
+    if [ "$i" == "-method" ] || [ "$i" == "-m" ]
+    then
+      next=1
+      last="-method"
+      continue
+    fi
+    ### -results "X"
+    if [ "$last" == "-results" ]
+    then
+      addition="$i"
+      Qtestboth=`echo $Qtestboth+1 |bc`
+      last=""
+      next=0
+      continue
+    fi
+    if [ "$i" == "-results" ] || [ "$i" == "-r" ]
+    then
+      next=1
+      last="-results"
+      continue
+    fi
+    ### -difference "X"
+    if [ "$last" == "-diff" ]
+    then
+      Qdiff=1
+      diff="$i"
+      last=""
+      next=0
+      continue
+    fi
+    if [ "$i" == "-diff" ] || [ "$i" == "-d" ]
+    then
+      next=1
+      last="-diff"
+      continue
+    fi
+    ### -abc
+    if [ "$i" == "-abc" ] || [ "$i" == "-ABC" ]
+    then
+      addition="ABC"
+      fromLOW=1
+      Qtestboth=`echo $Qtestboth+1 |bc`
+      continue
+    fi
+    ### -pm7
+    if [ "$i" == "-pm7" ] || [ "$i" == "-PM7" ]
+    then
+      addition="PM7"
+      Qtestboth=`echo $Qtestboth+1 |bc`
+      continue
+    fi
+    ### -program "X"
+    if [ "$last" == "-program" ]
+    then
+      program=$i
+      last=""
+      next=0
+      continue
+    fi
+    if [ "$i" == "-program" ] || [ "$i" == "-p" ]
+    then
+      next=1
+      last="-program"
+      continue
+    fi
+    ### -programs "X"
+    if [ "$last" == '-programs' ]
+    then
+      next=0
+      last=""
+      if [ "$i" == 2 ]
+      then
+        Qprograms="programs2.txt"
+      else
+        Qprograms="$i"
+      fi
+      continue
+    fi
+    if [ "$i" == "-programs" ]
+    then
+      next=1
+      last='-programs'
+      continue
+    fi
+    ###
+  else
+  # folder
+    L4=`echo $i | cut -c1-4`
+    if [ -d "$i" ] && [ "$L4" == "SYS_" ]
+    then
+      folders+=" $i"
+      continue
+    fi
+    ### UPDATE LOG FILES
+    echo "$scriptfile: I do not understand argument $i. [EXITING]"
+    exit
+  fi
+done
+
+#some controlling
+if [ $Qtestboth -gt 1 ]
+then 
+  echo "$scriptfile: Do not understand input ... too much -r and -o. EXITING"
+  exit
+fi
+
+#was collecting and difference set together?
+if [ $QfromfolderOLD -eq 1 ] && [ $Qdiff -eq 1 ]
+then
+  echo "$scriptfile: Please, do not combine taking old directory and difference ... Use collecting script first. EXITING"
+  exit
+fi
+
+###############################################################################
+################################ MAIN PROGRAM #################################
+################################ DO NOT TOUCH #################################
+###############################################################################
+
+# locate TOOLS path
+scriptpath=$(dirname $0)
+toolspath="$scriptpath/../TOOLS"
+
+# load names
+source $toolspath/TOOLSextra/names.txt
+
+# load functions
+source $toolspath/TOOLSextra/functions.sh
+
+# load parameters
+source $toolspath/TOOLSextra/loadparameters.sh
+
+parameters2=$parameters
+# programs
+source $toolspath/../$Qprograms
+parameters+=" $parameters2" 
+
+###############################################################################
+
+##################################
+## LOOP OVER ALL FOLDERS
+##################################
+for folder in $folders
+do
+  # going through all directories
+  echo "$scriptfile: `echo "${PWD##*/}"`: Entering folder $folder"
+  if [ ! -d $folder ]; 
+  then 
+    echo "$scriptfile: Some problem in reading directory $folder. EXITING";
+    exit
+  fi
+  cd $folder
+  #checking if the folder for new calculations already exist
+  if [ -d $folderNEW ]; 
+  then 
+    echo "$scriptfile: Folder $folderNEW in directory $folder already exists (calculation just of those what were not calculated yet)."
+  else
+    mkdir $folderNEW
+  fi
+  #Are we taking structures from file or from some folder? 
+  if [ -e results${addition}.dat ]   
+  then  
+    filetake=results${addition}.dat
+  else
+    echo "$scriptfile: results${addition}.dat does not exist (SKIPPED)"; cd ..;continue;
+  fi
+  if [ -e results${addition}_FILTERED.dat ] 
+  then 
+    filetake=results${addition}_FILTERED.dat
+  fi
+  ### TAKING LIST OF FILES 
+  # from OLD or from resultsXXX.dat
+  if [ $QfromfolderOLD -eq 1 ]
+  then
+    #taking from OLD folder
+    if [ -d ${folderOLD}/${name}-LM ]
+    then
+      files=`ls ${PWD}/${folderOLD}/${name}-LM/*.xyz`
+      if [ -z $files ]
+      then
+        cd ${folderOLD}/${name}-LM
+        $toolspath/JKlog2xyz *.log
+        cd ..
+        files=`ls ${PWD}/${folderOLD}/${name}-LM/*.xyz`
+      fi
+    else
+      files=`ls ${PWD}/${folderOLD}/*/${name}-LM/*.xyz`
+    fi
+  else
+    #Take just something in energy range or all files
+    if [ $Qdiff -eq 1 ]
+    then
+      # 3 or 4 columns?
+      columns=4
+      test=`head -n 1 $filetake | awk -v var=$columns '{print $var}'` 
+      if [ -z $test ]; then columns=3; fi
+      #find minimum in column
+      min=`cat $filetake | sort -nrk $columns | tail -n 1 | awk -v var=$columns '{print $var}'` 
+      #take specific files
+      files=`cat $filetake | awk -v var1=$diff -v var2=$min -v var3=$columns '$var3<(var2+var1/627.503)' | awk '{print $1}' | xargs`
+    else
+      #take all files
+      files=`cat $filetake | awk '{print $1}' | xargs` 
+    fi
+  fi
+  if [ -z "$files" ]
+  then
+    echo "$scriptfile: Probably no xyz files. CONTINUING"
+    cd ../
+    continue
+  fi
+  ###############################
+  row=`Felements $files`
+  echo "$scriptfile: $row files in total"
+  
+  ##PREPARE NEW FOLDER
+  cd $folderNEW
+  #calculate just those what were not calculated yet
+  if [ -e $calculated ] 
+  then
+    row=0 
+    for i in $files 
+    do 
+      N=`grep -c "$i" calculated.dat`
+      if [ $N -eq 0 ]
+      then
+        echo $i >> $calculated
+        filesNEXT+=" $i"
+        row=`echo $row+1|bc`
+      fi
+    done
+    files=$filesNEXT
+  else 
+    echo $files | xargs -n 1 > $calculated
+    row="all"
+  fi 
+  ###
+  if [ ! -d ${name}-LM ]; then mkdir ${name}-LM;fi
+  cd ${name}-LM
+  ###
+  #queue file name
+  random=$RANDOM
+  test=0
+  while [ $test -eq 0 ]
+  do
+    queueJKCS=queue${scriptfile}_${random}.dat
+    if [ -e $queueJKCS ]
+    then
+      random=$RANDOM
+    else
+      test=1
+    fi
+  done
+  qf=../../$queuefile 
+  qf2=../../$queuefile2
+ 
+  # RUN/
+  echo "$scriptfile: $row files are gonna be calculated"
+  if [ ! -z "$files" ]
+  then
+    #command
+    command="$toolspath/JKrun -programs $Qprograms -time $Qtime2 -q $qf2 -max $MAXJOBS -r $REPEAT -f $feeding -p $program -inp $queueJKCS"
+    if [ ! -z $Qpartition2 ]
+    then
+      command+=" -partition $Qpartition2"
+    fi
+    ###
+    # G16
+    if [ "$program" == "G16" ]
+    then 
+      $toolspath/JKxyz2com -cpu $CPU  $addmemory -nr -char $totcharge -mult $MULTIPLICITY $addbase -method "$method" $files >> output
+      inpfiles=`ls *.com`
+    fi
+    # XTB
+    if [ "$program" == "XTB" ] 
+    then
+      cp $files ./ 
+      inpfiles=`ls *.xyz`
+      #unpaired electrons 2*S=M-1
+      unpaired=`echo $MULTIPLICITY-1|bc`
+      #command improvement
+      command+=`echo " -opt \"$method -chrg $totcharge -uhf $unpaired\""`
+    fi
+    # ORCA
+    if [ "$program" == "ORCA" ]
+    then
+      $toolspath/JKxyz2inp -cpu $CPU $addmemory -char $totcharge -mult $MULTIPLICITY -method "$method" $files >> output
+      inpfiles=`ls *.job`
+    fi
+    # DLPNO
+    if [ "$program" == "DLPNO" ]
+    then
+      cp $files ./ 
+      inpfiles=`ls *.xyz`
+      if [ "$method" == "# wb97xd 6-31+g* opt" ]; then method=""; fi
+      #command improvement
+      command+=`echo " -opt \"$method -chrg $totcharge -mult $MULTIPLICITY\""`
+    fi
+    ################
+    echo $inpfiles > $queueJKCS
+
+    echo "$command" > run${scriptfile}_${random}.sh 
+    # checking queue program
+    if [ -z $programSendToQueue1part ] && [ -z $programSendToQueue2part ]
+    then
+      # calculate
+      sh run${scriptfile}_${random}.sh 
+    else
+      # calculate ... send to queue
+      #echo "$scriptfile: $programSendToQueue1part $parameters $programSendToQueue2part \"${command}\""
+      queue=`eval $programSendToQueue1part $parameters $programSendToQueue2part sh run${scriptfile}_${random}.sh`
+      echo "$scriptfile: $queue"
+      echo $queue | awk '{print $4}' >> $qf
+    fi
+    ##################### 
+  fi
+
+  cd ../../../
+done
+echo "$scriptfile: Done :-D"
